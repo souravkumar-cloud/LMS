@@ -1,0 +1,369 @@
+import mongoose from "mongoose";
+
+import Payment from "../models/Payment.js";
+import Subscription from "../models/Subscription.js";
+import SubscriptionPlan from "../models/SubscriptionPlan.js";
+import Notification from "../models/Notification.js";
+
+import generateReceipt from "../utils/generateReceipt.js";
+
+const generateReceiptNumber = () => {
+
+    const date = new Date();
+
+    const yyyy = date.getFullYear();
+
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+
+    const dd = String(date.getDate()).padStart(2, "0");
+
+    const random = Math.floor(
+
+        1000 + Math.random() * 9000
+
+    );
+
+    return `LMS-${yyyy}${mm}${dd}-${random}`;
+
+};
+
+export const createPayment = async (req, res) => {
+
+    const session = await mongoose.startSession();
+
+    session.startTransaction();
+
+    try {
+
+        const {
+
+            subscriptionId,
+
+            paymentMethod,
+
+            transactionId,
+
+            remarks
+
+        } = req.body;
+
+        const subscription = await Subscription.findById(
+
+            subscriptionId
+
+        ).session(session);
+
+        if (!subscription) {
+
+            throw new Error("Subscription not found.");
+
+        }
+
+        const existingPayment = await Payment.findOne({
+
+            subscription: subscriptionId,
+
+            status: "success"
+
+        }).session(session);
+
+        if (existingPayment) {
+
+            throw new Error(
+
+                "Payment already completed."
+
+            );
+
+        }
+
+        const plan = await SubscriptionPlan.findById(
+
+            subscription.plan
+
+        ).session(session);
+
+        const payment = await Payment.create([{
+
+            student: subscription.student,
+
+            subscription: subscription._id,
+
+            plan: plan._id,
+
+            amount: plan.price,
+
+            paymentType: "new-subscription",
+
+            paymentMethod,
+
+            transactionId,
+
+            receiptNumber:
+
+                generateReceiptNumber(),
+
+            status: "success",
+
+            remarks,
+
+            receivedBy: req.user.id,
+
+            paidAt: new Date()
+
+        }], {
+
+            session
+
+        });
+
+        subscription.status = "active";
+
+        await subscription.save({
+
+            session
+
+        });
+
+        await Notification.create([{
+
+            title: "Payment Successful",
+
+            message:
+
+            `₹${plan.price} payment received successfully.`,
+
+            recipient: subscription.student,
+
+            createdBy: req.user.id,
+
+            type: "payment"
+
+        }], {
+
+            session
+
+        });
+
+        await session.commitTransaction();
+
+        session.endSession();
+
+        res.status(201).json({
+
+            success: true,
+
+            message: "Payment Successful",
+
+            payment: payment[0]
+
+        });
+
+    }
+
+    catch (error) {
+
+        await session.abortTransaction();
+
+        session.endSession();
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
+
+};
+
+
+export const paymentHistory = async (req, res) => {
+
+    try {
+
+        const payments = await Payment.find({
+
+            student: req.user.id
+
+        })
+
+        .populate(
+
+            "plan",
+
+            "name"
+
+        )
+
+        .sort({
+
+            paidAt: -1
+
+        });
+
+        res.status(200).json({
+
+            success: true,
+
+            payments
+
+        });
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
+
+};
+
+export const totalRevenue = async (req, res) => {
+
+    try {
+
+        const revenue = await Payment.aggregate([
+
+            {
+
+                $match: {
+
+                    status: "success"
+
+                }
+
+            },
+
+            {
+
+                $group: {
+
+                    _id: null,
+
+                    totalRevenue: {
+
+                        $sum: "$amount"
+
+                    }
+
+                }
+
+            }
+
+        ]);
+
+        res.status(200).json({
+
+            success: true,
+
+            revenue:
+
+            revenue[0]?.totalRevenue || 0
+
+        });
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
+
+};
+
+export const downloadReceipt = async (req, res) => {
+
+    try {
+
+        const payment = await Payment.findById(
+
+            req.params.id
+
+        )
+
+        .populate(
+
+            "student",
+
+            "fullname email"
+
+        )
+
+        .populate(
+
+            "plan",
+
+            "name"
+
+        );
+
+        if (!payment) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message: "Payment not found."
+
+            });
+
+        }
+
+        if (
+
+            req.user.role === "student" &&
+
+            payment.student._id.toString() !== req.user.id
+
+        ) {
+
+            return res.status(403).json({
+
+                success: false,
+
+                message: "Unauthorized"
+
+            });
+
+        }
+
+        generateReceipt(
+
+            payment,
+
+            res
+
+        );
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
+
+};
