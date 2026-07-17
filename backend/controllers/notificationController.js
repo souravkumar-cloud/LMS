@@ -293,15 +293,20 @@ export const markAsRead = async (req, res) => {
 
         }
 
-        notification.isRead = true;
+        if (notification.adminOnly && req.user.role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                message: "This notification can only be deleted by the admin."
+            });
+        }
 
-        await notification.save();
+        await Notification.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
 
             success: true,
 
-            message: "Notification marked as read."
+            message: "Notification deleted automatically."
 
         });
 
@@ -347,6 +352,9 @@ export const deleteNotification = async (req, res) => {
 
         }
 
+        console.log(notification.recipient.toString());
+console.log(req.user.id);
+console.log(notification.recipient.toString() === req.user.id);
         /*
         =========================================
         Admin can delete ANY notification
@@ -367,6 +375,13 @@ export const deleteNotification = async (req, res) => {
 
         }
 
+        if (notification.adminOnly && req.user.role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                message: "This notification can only be deleted by the admin."
+            });
+        }
+
         /*
         =========================================
         Student can delete only own notification
@@ -374,7 +389,7 @@ export const deleteNotification = async (req, res) => {
         */
 
         if (
-            notification.recipient.toString() !== req.user.id
+            !notification.recipient.equals(req.user.id)
         ) {
 
             return res.status(403).json({
@@ -411,4 +426,51 @@ export const deleteNotification = async (req, res) => {
 
     }
 
+};
+
+export const sendToAdmin = async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) {
+            return res.status(400).json({
+                success: false,
+                message: "Message is required."
+            });
+        }
+
+        const admins = await User.find({ role: "admin" });
+        if (admins.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No admins found to receive the message."
+            });
+        }
+
+        const notifications = [];
+        for (const admin of admins) {
+            const notification = await Notification.create({
+                title: `Message from ${req.user.fullName}`,
+                message,
+                type: "system",
+                recipient: admin._id,
+                createdBy: req.user.id
+            });
+            notifications.push(notification);
+
+            // Emit to each admin
+            getIO().to(admin._id.toString()).emit("notification", notification);
+            getIO().to(admin._id.toString()).emit("newNotification", notification);
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Message sent to admin successfully.",
+            notifications
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
 };

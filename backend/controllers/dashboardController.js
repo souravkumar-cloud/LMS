@@ -147,7 +147,7 @@ export const adminDashboard = async (req, res) => {
 
                         },
 
-                        status:"success"
+                        paymentStatus:"paid"
 
                     }
 
@@ -183,7 +183,7 @@ export const adminDashboard = async (req, res) => {
 
                         },
 
-                        status:"success"
+                        paymentStatus:"paid"
 
                     }
 

@@ -84,21 +84,11 @@ const StudentDetails = () => {
 
                     <div className="flex flex-col items-center">
 
-                        <img
+                        <div className="h-36 w-36 rounded-full border-4 border-blue-500 bg-slate-50 flex items-center justify-center text-slate-400">
 
-                            src={
+                            <User size={64} />
 
-                                student.profilePhoto ||
-
-                                `https://ui-avatars.com/api/?name=${student.fullName}`
-
-                            }
-
-                            alt="Profile"
-
-                            className="h-36 w-36 rounded-full object-cover border-4 border-blue-500"
-
-                        />
+                        </div>
 
                         <h2 className="text-2xl font-bold mt-4">
 

@@ -1,24 +1,29 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import Loader from "../../components/common/Loader";
 import studentService from "../../services/studentService";
 import seatService from "../../services/seatService";
+import subscriptionService from "../../services/subscriptionService";
 
 const EditStudent = () => {
 
     const { id } = useParams();
 
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [loading, setLoading] = useState(true);
 
     const [saving, setSaving] = useState(false);
 
-    const [preview, setPreview] = useState("");
+
 
     const [availableSeats, setAvailableSeats] = useState([]);
+
+    const [plans, setPlans] = useState([]);
+    const [selectedPlanId, setSelectedPlanId] = useState("");
 
     const [seatData, setSeatData] = useState({
         floor: "",
@@ -52,7 +57,7 @@ const EditStudent = () => {
 
         emergencyContact: "",
 
-        profilePhoto: null
+
 
     });
 
@@ -88,13 +93,9 @@ const EditStudent = () => {
 
                 guardianPhone: student.guardianPhone || "",
 
-                emergencyContact: student.emergencyContact || "",
-
-                profilePhoto: null
+                emergencyContact: student.emergencyContact || ""
 
             });
-
-            setPreview(student.profilePhoto || "");
 
             if (student.seat) {
 
@@ -108,6 +109,19 @@ const EditStudent = () => {
 
                 });
 
+            }
+
+            // Load subscription plans
+            try {
+                const plansRes = await subscriptionService.getPlans();
+                setPlans(plansRes.plans);
+            } catch (err) {
+                console.log("Error loading plans:", err);
+            }
+
+            // Set student's active plan
+            if (student.subscription && student.subscription.plan) {
+                setSelectedPlanId(student.subscription.plan._id || student.subscription.plan);
             }
 
         }
@@ -170,6 +184,19 @@ const EditStudent = () => {
 
     }, [seatData.floor, seatData.category]);
 
+    useEffect(() => {
+        const selectedPlan = plans.find(p => p._id === selectedPlanId);
+        const isHourly = selectedPlan?.category === "not fixed" || selectedPlan?.name?.toLowerCase().includes("hourly");
+        if (isHourly) {
+            setSeatData(prev => ({
+                ...prev,
+                floor: "",
+                category: "",
+                seatId: ""
+            }));
+        }
+    }, [selectedPlanId, plans]);
+
     const handleChange = (e) => {
 
         setFormData({
@@ -194,23 +221,7 @@ const EditStudent = () => {
 
     };
 
-    const handleImage = (e) => {
 
-        const file = e.target.files[0];
-
-        if (!file) return;
-
-        setPreview(URL.createObjectURL(file));
-
-        setFormData({
-
-            ...formData,
-
-            profilePhoto: file
-
-        });
-
-    };
 
     const handleSubmit = async (e) => {
 
@@ -233,10 +244,14 @@ const EditStudent = () => {
             });
 
             data.append("seatId", seatData.seatId);
+            data.append("planId", selectedPlanId);
+            if (shouldActivate) {
+                data.append("isActive", true);
+            }
 
             await studentService.updateStudent(id, data);
 
-            toast.success("Student Updated Successfully");
+            toast.success(shouldActivate ? "Student Activated Successfully" : "Student Updated Successfully");
 
             navigate("/admin/students");
 
@@ -270,15 +285,27 @@ const EditStudent = () => {
 
     }
 
+    const queryParams = new URLSearchParams(location.search);
+    const shouldActivate = queryParams.get("activate") === "true";
+
+    const selectedPlan = plans.find(p => p._id === selectedPlanId);
+    const isHourly = selectedPlan?.category === "not fixed" || selectedPlan?.name?.toLowerCase().includes("hourly");
+
     return (
 
         <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-8">
 
             <h1 className="text-3xl font-bold mb-8">
 
-                Edit Student
+                {shouldActivate ? "Activate Student Account" : "Edit Student"}
 
             </h1>
+
+            {shouldActivate && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 text-sm">
+                    <strong>Account Activation:</strong> Please select a subscription plan and assign a seat to activate this student's account.
+                </div>
+            )}
 
             <form
     onSubmit={handleSubmit}
@@ -356,139 +383,144 @@ const EditStudent = () => {
 
     </div>
 
-    {/* ---------------- Seat Assignment ---------------- */}
-
+    {/* ---------------- Subscription Plan ---------------- */}
     <div className="md:col-span-2 border-t pt-6">
 
         <h2 className="text-2xl font-semibold mb-6 text-blue-600">
 
-            Seat Assignment
+            Subscription Plan
 
         </h2>
 
     </div>
 
-    <div>
-
-        <label className="block mb-2 font-medium">
-
-            Floor
-
-        </label>
-
-        <select
-            name="floor"
-            value={seatData.floor}
-            onChange={handleSeatChange}
-            className="w-full rounded-lg border px-4 py-3"
-        >
-
-            <option value="">Select Floor</option>
-
-            <option value="1">First Floor</option>
-
-            <option value="2">Second Floor</option>
-
-            <option value="3">Third Floor</option>
-
-        </select>
-
-    </div>
-
-    <div>
-
-        <label className="block mb-2 font-medium">
-
-            Category
-
-        </label>
-
-        <select
-            name="category"
-            value={seatData.category}
-            onChange={handleSeatChange}
-            className="w-full rounded-lg border px-4 py-3"
-        >
-
-            <option value="">Select Category</option>
-
-            <option value="regular">Regular</option>
-
-            <option value="premium">Premium</option>
-
-        </select>
-
-    </div>
-
     <div className="md:col-span-2">
-
         <label className="block mb-2 font-medium">
-
-            Seat Number
-
+            Plan
         </label>
-
         <select
-            name="seatId"
-            value={seatData.seatId}
-            onChange={handleSeatChange}
+            name="planId"
+            value={selectedPlanId}
+            onChange={(e) => setSelectedPlanId(e.target.value)}
             className="w-full rounded-lg border px-4 py-3"
+            required={shouldActivate}
         >
-
-            <option value="">Select Seat</option>
-
-            {
-
-                availableSeats.map((seat) => (
-
-                    <option
-                        key={seat._id}
-                        value={seat._id}
-                    >
-
-                        Seat {seat.seatNumber} | Floor {seat.floor} | {seat.category}
-
-                    </option>
-
-                ))
-
-            }
-
+            <option value="">Select Plan</option>
+            {plans.map((plan) => (
+                <option key={plan._id} value={plan._id}>
+                    {plan.name} - ₹{plan.price} ({plan.category})
+                </option>
+            ))}
         </select>
-
     </div>
 
-    {/* ---------------- Profile Photo ---------------- */}
+    {!isHourly && (
+        <>
+            {/* ---------------- Seat Assignment ---------------- */}
 
-    <div className="md:col-span-2">
+            <div className="md:col-span-2 border-t pt-6">
 
-        <label className="block mb-2 font-medium">
+                <h2 className="text-2xl font-semibold mb-6 text-blue-600">
 
-            Profile Photo
+                    Seat Assignment
 
-        </label>
+                </h2>
 
-        <input
-            type="file"
-            accept="image/*"
-            onChange={handleImage}
-        />
+            </div>
 
-        {
+            <div>
 
-            preview && (
+                <label className="block mb-2 font-medium">
 
-                <img
-                    src={preview}
-                    alt="Preview"
-                    className="h-40 mt-4 rounded-lg border object-cover"
-                />
+                    Floor
 
-            )
+                </label>
 
-        }
+                <select
+                    name="floor"
+                    value={seatData.floor}
+                    onChange={handleSeatChange}
+                    className="w-full rounded-lg border px-4 py-3"
+                >
 
-    </div>
+                    <option value="">Select Floor</option>
+
+                    <option value="1">First Floor</option>
+
+                    <option value="2">Second Floor</option>
+
+                    <option value="3">Third Floor</option>
+
+                </select>
+
+            </div>
+
+            <div>
+
+                <label className="block mb-2 font-medium">
+
+                    Category
+
+                </label>
+
+                <select
+                    name="category"
+                    value={seatData.category}
+                    onChange={handleSeatChange}
+                    className="w-full rounded-lg border px-4 py-3"
+                >
+
+                    <option value="">Select Category</option>
+
+                    <option value="regular">Regular</option>
+
+                    <option value="premium">Premium</option>
+
+                </select>
+
+            </div>
+
+            <div className="md:col-span-2">
+
+                <label className="block mb-2 font-medium">
+
+                    Seat Number
+
+                </label>
+
+                <select
+                    name="seatId"
+                    value={seatData.seatId}
+                    onChange={handleSeatChange}
+                    className="w-full rounded-lg border px-4 py-3"
+                >
+
+                    <option value="">Select Seat</option>
+
+                    {
+
+                        availableSeats.map((seat) => (
+
+                            <option
+                                key={seat._id}
+                                value={seat._id}
+                            >
+
+                                Seat {seat.seatNumber} | Floor {seat.floor} | {seat.category}
+
+                            </option>
+
+                        ))
+
+                    }
+
+                </select>
+
+            </div>
+        </>
+    )}
+
+
 
     <div className="md:col-span-2 flex gap-4 mt-6">
 
@@ -499,13 +531,9 @@ const EditStudent = () => {
         >
 
             {
-
                 saving
-
-                    ? "Updating..."
-
-                    : "Update Student"
-
+                    ? (shouldActivate ? "Activating..." : "Updating...")
+                    : (shouldActivate ? "Activate Student" : "Update Student")
             }
 
         </button>

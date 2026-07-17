@@ -8,8 +8,6 @@ const AddStudent = () => {
 
     const [loading, setLoading] = useState(false);
 
-    const [preview, setPreview] = useState(null);
-
     const [plans, setPlans] = useState([]);
 
     const [availableSeats, setAvailableSeats] = useState([]);
@@ -40,9 +38,7 @@ const AddStudent = () => {
 
         paymentMethod: "",
 
-        planId: "",
-
-        profilePhoto: null
+        planId: ""
 
     });
 
@@ -60,50 +56,17 @@ const AddStudent = () => {
 
     };
 
-    const handleImage = (e) => {
 
-        const file = e.target.files[0];
-
-        if (!file) return;
-
-        setPreview(URL.createObjectURL(file));
-
-        setFormData({
-
-            ...formData,
-
-            profilePhoto: file
-
-        });
-
-    };
 
     const handleSubmit = async (e) => {
 
         e.preventDefault();
 
-
-
         try {
 
             setLoading(true);
 
-            const data = new FormData();
-
-            Object.keys(formData).forEach((key) => {
-
-                data.append(key, formData[key]);
-
-            });
-
-            for (const pair of data.entries()) {
-
-                console.log(pair[0], pair[1]);
-
-            }
-
-
-            await studentService.addStudent(data);
+            await studentService.addStudent(formData);
 
             toast.success("Student Added Successfully");
 
@@ -127,14 +90,10 @@ const AddStudent = () => {
 
                 paymentMethod: "",
 
-                planId: "",
-
-                profilePhoto: null
+                planId: ""
 
 
             });
-
-            setPreview(null);
 
         }
 
@@ -159,8 +118,6 @@ const AddStudent = () => {
     };
 
     useEffect(() => {
-        if (!formData.floor || !formData.category) return;
-
         const loadPlans = async () => {
             try {
                 const res = await subscriptionService.getPlans();
@@ -169,46 +126,52 @@ const AddStudent = () => {
                 console.log(error);
             }
         };
+        loadPlans();
+    }, []);
 
-        loadPlans()
+    useEffect(() => {
+        if (!formData.floor || !formData.category) return;
 
         const loadSeats = async () => {
             try {
                 const res = await seatService.getAllSeats();
-                console.log(res);
                 const filtered = res.seats.filter(
                     seat => {
-
                         return (
                             seat.floor == formData.floor &&
                             seat.category === formData.category &&
                             seat.status === "available"
                         );
-                    })
-                console.log(filtered);
+                    });
                 setAvailableSeats(filtered);
             } catch (error) {
-
-    console.log("Status:", error.response?.status);
-
-    console.log("Response:", error.response?.data);
-
-    toast.error(
-        error.response?.data?.message || "Something went wrong"
-    );
-
-}
+                console.log("Error loading seats:", error);
+            }
         };
         loadSeats();
-        console.log(formData.floor);
-        console.log(formData.category);
-    }, [formData.floor, formData.category])
+    }, [formData.floor, formData.category]);
+
+    useEffect(() => {
+        const selectedPlan = plans.find(p => p._id === formData.planId);
+        const isHourly = selectedPlan?.category === "not fixed" || selectedPlan?.name?.toLowerCase().includes("hourly");
+        if (isHourly) {
+            setFormData(prev => ({
+                ...prev,
+                floor: "",
+                category: "",
+                seatId: ""
+            }));
+        }
+    }, [formData.planId, plans]);
 
     useEffect(() => {
 
     console.log("Plans:", plans);
 
 }, [plans]);
+
+    const selectedPlan = plans.find(p => p._id === formData.planId);
+    const isHourly = selectedPlan?.category === "not fixed" || selectedPlan?.name?.toLowerCase().includes("hourly");
 
     return (
 
@@ -383,105 +346,109 @@ const AddStudent = () => {
                     onChange={handleChange}
                 />
 
-                {/* ================= Seat Assignment ================= */}
+                {!isHourly && (
+                    <>
+                        {/* ================= Seat Assignment ================= */}
 
-                <div className="md:col-span-2 mt-4">
+                        <div className="md:col-span-2 mt-4">
 
-                    <h2 className="text-xl font-bold text-blue-600 border-b pb-2 mb-5">
+                            <h2 className="text-xl font-bold text-blue-600 border-b pb-2 mb-5">
 
-                        Seat Assignment
+                                Seat Assignment
 
-                    </h2>
+                            </h2>
 
-                </div>
+                        </div>
 
-                <div>
+                        <div>
 
-                    <label className="block mb-2 font-medium">
+                            <label className="block mb-2 font-medium">
 
-                        Floor
+                                Floor
 
-                    </label>
+                            </label>
 
-                    <select
-                        name="floor"
-                        value={formData.floor}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-4 py-3"
-                    >
+                            <select
+                                name="floor"
+                                value={formData.floor}
+                                onChange={handleChange}
+                                className="w-full border rounded-lg px-4 py-3"
+                            >
 
-                        <option value="">Select Floor</option>
+                                <option value="">Select Floor</option>
 
-                        <option value="1">First Floor</option>
+                                <option value="1">First Floor</option>
 
-                        <option value="2">Second Floor</option>
+                                <option value="2">Second Floor</option>
 
-                    </select>
+                            </select>
 
-                </div>
+                        </div>
 
-                <div>
+                        <div>
 
-                    <label className="block mb-2 font-medium">
+                            <label className="block mb-2 font-medium">
 
-                        Seat Category
+                                Seat Category
 
-                    </label>
+                            </label>
 
-                    <select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-4 py-3"
-                    >
+                            <select
+                                name="category"
+                                value={formData.category}
+                                onChange={handleChange}
+                                className="w-full border rounded-lg px-4 py-3"
+                            >
 
-                        <option value="">Select Category</option>
+                                <option value="">Select Category</option>
 
-                        <option value="regular">Regular</option>
+                                <option value="regular">Regular</option>
 
-                        <option value="premium">Premium</option>
+                                <option value="premium">Premium</option>
 
-                    </select>
+                            </select>
 
-                </div>
+                        </div>
 
-                <div className="md:col-span-2">
+                        <div className="md:col-span-2">
 
-                    <label className="block mb-2 font-medium">
+                            <label className="block mb-2 font-medium">
 
-                        Assign Seat
+                                Assign Seat
 
-                    </label>
+                            </label>
 
-                    <select
-                        name="seatId"
-                        value={formData.seatId}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-4 py-3"
-                    >
+                            <select
+                                name="seatId"
+                                value={formData.seatId}
+                                onChange={handleChange}
+                                className="w-full border rounded-lg px-4 py-3"
+                            >
 
-                        <option value="">Select Seat</option>
+                                <option value="">Select Seat</option>
 
-                        {
+                                {
 
-                            availableSeats.map((seat) => (
+                                    availableSeats.map((seat) => (
 
-                                <option
-                                    key={seat._id}
-                                    value={seat._id}
-                                >
+                                        <option
+                                            key={seat._id}
+                                            value={seat._id}
+                                        >
 
-                                    Seat {seat.seatNumber} • Floor {seat.floor} • {seat.category}
+                                            Seat {seat.seatNumber} • Floor {seat.floor} • {seat.category}
 
-                                </option>
+                                        </option>
 
-                            ))
+                                    ))
 
-                        }
+                                }
 
-                    </select>
+                            </select>
 
-                </div>
+                        </div>
+                    </>
+                )}
 
                 {/* ================= Payment ================= */}
 
@@ -515,6 +482,8 @@ const AddStudent = () => {
                         <option value="cash">Cash</option>
 
                         <option value="upi">UPI</option>
+
+                        <option value="pending">Pending</option>
 
                     </select>
 

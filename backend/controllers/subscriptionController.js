@@ -199,15 +199,9 @@ export const renewSubscription = async (req,res)=>{
 
         );
 
-        subscription.endDate = new Date(
-
-            subscription.endDate.getTime()
-
-            +
-
-            plan.durationInDays * 24 * 60 * 60 * 1000
-
-        );
+        const currentEndDate = new Date(subscription.endDate);
+        currentEndDate.setMonth(currentEndDate.getMonth() + 1);
+        subscription.endDate = currentEndDate;
 
         await subscription.save();
 
@@ -303,12 +297,8 @@ export const subscribePlan = async (req, res) => {
 
         const startDate = new Date();
 
-        const endDate = new Date(
-
-            startDate.getTime() +
-            plan.durationInDays * 24 * 60 * 60 * 1000
-
-        );
+        const endDate = new Date(startDate);
+        endDate.setMonth(startDate.getMonth() + 1);
 
         const subscription = await Subscription.create({
 
@@ -443,10 +433,9 @@ export const approveUpgrade = async (req, res) => {
 
         subscription.plan = newPlan._id;
 
-        subscription.endDate = new Date(
-            Date.now() +
-            newPlan.durationInDays * 24 * 60 * 60 * 1000
-        );
+        const nextMonthDate = new Date();
+        nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+        subscription.endDate = nextMonthDate;
 
         await subscription.save();
 

@@ -70,7 +70,7 @@ const generateReceipt = (payment, res) => {
 
     doc.moveDown();
 
-    doc.text(`Student : ${payment.student.fullname}`);
+    doc.text(`Student : ${payment.student.fullName}`);
 
     doc.text(`Email : ${payment.student.email}`);
 

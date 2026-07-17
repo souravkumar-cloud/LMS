@@ -29,7 +29,7 @@ const paymentSchema=new mongoose.Schema({
     },
     paymentMethod:{
         type:String,
-        enum:["cash","upi"],
+        enum:["cash","upi","pending"],
         required:true
     },
     paymentStatus:{
@@ -48,8 +48,7 @@ const paymentSchema=new mongoose.Schema({
         required:true
     },
     paidAt:{
-        type:Date,
-        required:true
+        type:Date
     }
 },{timestamps:true});
 

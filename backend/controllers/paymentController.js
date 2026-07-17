@@ -184,17 +184,26 @@ export const paymentHistory = async (req, res) => {
 
     try {
 
-        const payments = await Payment.find({
+        let query = {};
+        if (req.user.role === "student") {
+            query.student = req.user.id;
+        }
 
-            student: req.user.id
-
-        })
+        const payments = await Payment.find(query)
 
         .populate(
 
             "plan",
 
             "name"
+
+        )
+
+        .populate(
+
+            "student",
+
+            "fullName email phone"
 
         )
 
@@ -235,13 +244,9 @@ export const totalRevenue = async (req, res) => {
         const revenue = await Payment.aggregate([
 
             {
-
                 $match: {
-
-                    status: "success"
-
+                    paymentStatus: "paid"
                 }
-
             },
 
             {
@@ -302,7 +307,7 @@ export const downloadReceipt = async (req, res) => {
 
             "student",
 
-            "fullname email"
+            "fullName email"
 
         )
 
@@ -366,4 +371,69 @@ export const downloadReceipt = async (req, res) => {
 
     }
 
+};
+
+export const deletePayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const payment = await Payment.findById(id);
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment record not found"
+            });
+        }
+
+        await payment.deleteOne();
+
+        res.status(200).json({
+            success: true,
+            message: "Payment record deleted successfully"
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+export const collectPayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { paymentMethod } = req.body;
+
+        const payment = await Payment.findById(id);
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment record not found."
+            });
+        }
+
+        if (payment.paymentStatus === "paid") {
+            return res.status(400).json({
+                success: false,
+                message: "Payment has already been collected."
+            });
+        }
+
+        payment.paymentStatus = "paid";
+        payment.paymentMethod = paymentMethod || "cash";
+        payment.paidAt = new Date();
+
+        await payment.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Payment status updated to paid successfully.",
+            payment
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
 };

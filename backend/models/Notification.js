@@ -57,6 +57,10 @@ const notificationSchema = new mongoose.Schema(
         type: String,
         default: ""
     },
+    adminOnly: {
+        type: Boolean,
+        default: false
+    },
 
     expiresAt: {
         type: Date,

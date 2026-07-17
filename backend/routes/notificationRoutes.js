@@ -6,7 +6,8 @@ import {
     myNotifications,
     unreadCount,
     markAsRead,
-    deleteNotification
+    deleteNotification,
+    sendToAdmin
 } from "../controllers/notificationController.js";
 
 import authMiddleware from "../middlewares/authMiddleware.js";
@@ -76,6 +77,13 @@ router.delete(
     "/:id",
     authMiddleware,
     deleteNotification
+);
+
+// Send message to admin
+router.post(
+    "/send-to-admin",
+    authMiddleware,
+    sendToAdmin
 );
 
 export default router;

@@ -10,7 +10,7 @@ export const getAuditLogs = async (req, res) => {
 
                 "admin",
 
-                "fullname email"
+                "fullName email"
 
             )
 
@@ -78,7 +78,7 @@ export const filterAuditLogs = async (req, res) => {
 
                 "admin",
 
-                "fullname email"
+                "fullName email"
 
             )
 

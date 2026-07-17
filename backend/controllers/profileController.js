@@ -74,6 +74,8 @@ export const updateProfile = async (req, res) => {
             user.emergencyContact = emergencyContact;
         }
 
+
+
         await user.save();
 
         const safeUser = await User.findById(user._id)
@@ -142,86 +144,4 @@ export const profileSummary = async (req, res) => {
 
     }
 };
-
-/*
-====================================================
-Upload Profile Photo
-(Student/Admin)
-====================================================
-*/
-export const uploadProfilePhoto = async (req, res) => {
-
-    try {
-
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: "Please upload an image."
-            });
-        }
-
-        const user = await User.findById(req.user.id);
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found."
-            });
-        }
-
-        /*
-        =========================================
-        Delete Previous Image From Cloudinary
-        =========================================
-        */
-
-        if (user.profileImage) {
-
-            try {
-
-                const urlParts = user.profileImage.split("/");
-
-                const fileName = urlParts[urlParts.length - 1];
-
-                const publicId =
-                    "library-management-system/" +
-                    fileName.split(".")[0];
-
-                await cloudinary.uploader.destroy(publicId);
-
-            } catch (err) {
-
-                console.log(
-                    "Old Image Delete Failed:",
-                    err.message
-                );
-
-            }
-
-        }
-
-        /*
-        =========================================
-        Save New Image
-        =========================================
-        */
-
-        user.profileImage = req.file.path;
-
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: "Profile Photo Updated Successfully",
-            profileImage: user.profileImage
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-
-    }
-};
+

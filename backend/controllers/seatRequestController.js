@@ -4,6 +4,7 @@ import Subscription from "../models/Subscription.js";
 import Notification from "../models/Notification.js";
 import { getIO } from "../socket/socket.js";
 import User from "../models/User.js";
+import LibrarySetting from "../models/LibrarySetting.js";
 
 export const createSeatRequest = async (req, res) => {
 
@@ -22,8 +23,6 @@ export const createSeatRequest = async (req, res) => {
 
         } = req.body;
 
-        // Check seat exists
-
         const seat = await Seat.findById(requestedSeatId);
 
         if (!seat) {
@@ -36,6 +35,29 @@ export const createSeatRequest = async (req, res) => {
 
             });
 
+        }
+
+        // Check if student already has an assigned seat
+        const currentSeat = await Seat.findOne({
+            student: studentId
+        });
+
+        let requestType = "new-seat";
+        let currentSeatId = null;
+
+        if (currentSeat) {
+            const settings = await LibrarySetting.findOne();
+            const allowSeatChange = settings ? settings.allowSeatChange : true;
+
+            if (!allowSeatChange) {
+                return res.status(400).json({
+                    success: false,
+                    message: `You already have an assigned seat (Seat ${currentSeat.seatNumber}).`
+                });
+            }
+
+            requestType = "seat-change";
+            currentSeatId = currentSeat._id;
         }
 
         // Seat available?
@@ -84,35 +106,11 @@ export const createSeatRequest = async (req, res) => {
 
         }
 
-        // Current seat
-
-        const currentSeat = await Seat.findOne({
-
-            student: studentId
-
-        });
-
-        if (
-            currentSeat &&
-            currentSeat._id.toString() === requestedSeatId
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "You are already using this seat."
-            });
-        }
-
-        const requestType = currentSeat
-
-            ? "seat-change"
-
-            : "new-seat";
-
         const seatRequest = await SeatRequest.create({
 
             student: studentId,
 
-            currentSeat: currentSeat?._id || null,
+            currentSeat: currentSeatId,
 
             requestedSeat: requestedSeatId,
 
@@ -355,13 +353,7 @@ export const approveSeatRequest = async (req, res) => {
             }
         )
 
-        request.status = "approved";
-
-        request.reviewedBy = req.user.id;
-
-        request.reviewedAt = new Date();
-
-        await request.save();
+        await SeatRequest.findByIdAndDelete(req.params.id);
 
         const notification = await Notification.create({
 
@@ -433,13 +425,7 @@ export const rejectSeatRequest = async (req, res) => {
 
         }
 
-        request.status = "rejected";
-
-        request.reviewedBy = req.user.id;
-
-        request.reviewedAt = new Date();
-
-        await request.save();
+        await SeatRequest.findByIdAndDelete(req.params.id);
 
         const notification = await Notification.create({
 
@@ -529,7 +515,7 @@ export const cancelSeatRequest = async (req, res) => {
 
         }
 
-        if (request.status !== "pending-approval") {
+        if (request.status !== "pending") {
 
             return res.status(400).json({
 
@@ -541,9 +527,7 @@ export const cancelSeatRequest = async (req, res) => {
 
         }
 
-        request.status = "cancelled";
-
-        await request.save();
+        await SeatRequest.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
 

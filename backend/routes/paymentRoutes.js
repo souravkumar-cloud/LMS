@@ -1,15 +1,12 @@
 import express from "express";
 
 import {
-
     createPayment,
-
     paymentHistory,
-
     totalRevenue,
-
-    downloadReceipt
-
+    downloadReceipt,
+    deletePayment,
+    collectPayment
 } from "../controllers/paymentController.js";
 
 import authMiddleware from "../middlewares/authMiddleware.js";
@@ -25,15 +22,18 @@ Admin Routes
 
 // Create Payment
 router.post(
-
     "/create",
-
     authMiddleware,
-
     adminMiddleware,
-
     createPayment
+);
 
+// Collect Payment
+router.put(
+    "/collect/:id",
+    authMiddleware,
+    adminMiddleware,
+    collectPayment
 );
 
 // Total Revenue
@@ -46,6 +46,18 @@ router.get(
     adminMiddleware,
 
     totalRevenue
+
+);
+
+router.delete(
+
+    "/delete/:id",
+
+    authMiddleware,
+
+    adminMiddleware,
+
+    deletePayment
 
 );
 

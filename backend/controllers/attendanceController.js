@@ -154,7 +154,7 @@ export const getTodayAttendance=async(req,res)=>{
             attendanceDate:today
         }).populate(
             "student",
-            "fullname"
+            "fullName"
         ).populate(
             "seat","seatNumber"
         );

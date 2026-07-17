@@ -63,9 +63,7 @@ export const addStudent = async (req, res) => {
             // seatId:req.body.seatId,
             emergencyContact: req.body.emergencyContact,
             paymentMethod,
-            planId,
-
-            profilePhoto: req.file ? req.file.path : ""
+            planId
         });
         const plan = await SubscriptionPlan.findById(planId);
         console.log(plan);
@@ -74,6 +72,22 @@ export const addStudent = async (req, res) => {
                 success: false,
                 message: "Subscription plan not found"
             });
+        }
+
+        if (plan.category === "not fixed") {
+            if (seatId) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A seat cannot be assigned to a 'not fixed' subscription plan."
+                });
+            }
+        } else {
+            if (!seatId) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A seat must be assigned for a 'regular' or 'premium' subscription plan."
+                });
+            }
         }
 
         if (!plan.durationInDays || plan.durationInDays <= 0) {
@@ -86,10 +100,7 @@ export const addStudent = async (req, res) => {
         const startDate = new Date();
 
         const endDate = new Date(startDate);
-
-        endDate.setDate(
-            endDate.getDate() + Number(plan.durationInDays)
-        );
+        endDate.setMonth(startDate.getMonth() + 1);
 
         const subscription = await Subscription.create({
 
@@ -121,11 +132,11 @@ export const addStudent = async (req, res) => {
 
             paymentType: "new-admission",
 
-            paymentStatus: "paid",
+            paymentStatus: paymentMethod === "pending" ? "pending" : "paid",
 
             receiptNumber: `RCPT-${Date.now()}`,
 
-            paidAt: new Date()
+            paidAt: paymentMethod === "pending" ? null : new Date()
 
         });
 
@@ -184,7 +195,7 @@ export const getAllStudents = async (req, res) => {
             .select("-password");
         // .populate("SeatNumber");
 
-        const usersWithSeat = await Promise.all(
+        const usersWithDetails = await Promise.all(
 
             users.map(async (user) => {
 
@@ -192,9 +203,14 @@ export const getAllStudents = async (req, res) => {
                     student: user._id
                 });
 
+                const payment = await Payment.findOne({
+                    student: user._id
+                }).sort({ createdAt: -1 });
+
                 return {
                     ...user.toObject(),
-                    seat
+                    seat,
+                    paymentStatus: payment ? payment.paymentStatus : "N/A"
                 };
 
             })
@@ -205,7 +221,7 @@ export const getAllStudents = async (req, res) => {
 
             success: true,
 
-            students: usersWithSeat
+            students: usersWithDetails
 
         });
 
@@ -314,7 +330,9 @@ export const updateStudent = async (req, res) => {
             guardianName,
             guardianPhone,
             emergencyContact,
-            seatId
+            seatId,
+            planId,
+            isActive
         } = req.body;
 
         const student = await User.findById(id);
@@ -326,6 +344,95 @@ export const updateStudent = async (req, res) => {
                 message: "Student not found"
             });
 
+        }
+
+        // -----------------------
+        // Plan & Subscription Update
+        // -----------------------
+        let isHourly = false;
+        if (planId) {
+            const plan = await SubscriptionPlan.findById(planId);
+            if (!plan) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Subscription plan not found."
+                });
+            }
+
+            isHourly = plan.category === "not fixed" || plan.name?.toLowerCase().includes("hourly");
+
+            // Deactivate any existing active subscriptions for this student
+            await Subscription.updateMany(
+                { student: student._id, status: "active" },
+                { status: "expired" }
+            );
+
+            const startDate = new Date();
+            const endDate = new Date(startDate);
+            endDate.setMonth(startDate.getMonth() + 1);
+
+            const subscription = await Subscription.create({
+                student: student._id,
+                plan: plan._id,
+                startDate,
+                endDate,
+                status: "active"
+            });
+
+            // Also create a payment record
+            await Payment.create({
+                student: student._id,
+                plan: plan._id,
+                subscription: subscription._id,
+                amount: plan.price,
+                paymentMethod: "cash",
+                paymentType: "subscription-renewal",
+                paymentStatus: "paid",
+                receiptNumber: `RCPT-${Date.now()}`,
+                paidAt: new Date()
+            });
+
+            if (isHourly) {
+                // If they are hourly, clear seat assignment
+                const oldSeat = await Seat.findOne({
+                    student: student._id
+                });
+                if (oldSeat) {
+                    oldSeat.student = null;
+                    oldSeat.status = "available";
+                    await oldSeat.save();
+                }
+                student.seatId = null;
+            }
+        }
+
+        // Handle Activation Flag
+        if (isActive === "true" || isActive === true) {
+            student.isActive = true;
+        }
+
+        // Validate Seat assignment on Active status
+        if (student.isActive) {
+            let checkHourly = isHourly;
+            if (!planId) {
+                const currentSub = await Subscription.findOne({
+                    student: student._id,
+                    status: "active"
+                }).populate("plan");
+                if (currentSub) {
+                    checkHourly = currentSub.plan.category === "not fixed" || currentSub.plan.name?.toLowerCase().includes("hourly");
+                }
+            }
+
+            if (!checkHourly) {
+                const finalSeatId = seatId || student.seatId;
+                if (!finalSeatId) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "A seat must be assigned for regular or premium subscription plans."
+                    });
+                }
+            }
         }
 
         // -----------------------
@@ -346,13 +453,6 @@ export const updateStudent = async (req, res) => {
         student.emergencyContact =
             emergencyContact || student.emergencyContact;
 
-        // If using multer/cloudinary
-        if (req.file) {
-
-            student.profilePhoto = req.file.path;
-
-        }
-
         await student.save();
 
         // -----------------------
@@ -360,6 +460,17 @@ export const updateStudent = async (req, res) => {
         // -----------------------
 
         if (seatId) {
+            const subscription = await Subscription.findOne({
+                student: student._id,
+                status: "active"
+            }).populate("plan");
+
+            if (subscription && subscription.plan.category === "not fixed") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Cannot assign a seat to a student with an hourly/not fixed subscription plan."
+                });
+            }
 
             // Current seat of student
             const oldSeat = await Seat.findOne({
@@ -449,9 +560,27 @@ export const toggleStudentStatus = async (req, res) => {
 
         student.isActive = !student.isActive;
 
-        // If deactivating the student
-        if (!student.isActive) {
+        // If activating the student
+        if (student.isActive) {
+            const subscription = await Subscription.findOne({
+                student: student._id,
+                status: "active"
+            }).populate("plan");
 
+            if (subscription) {
+                const isHourly = subscription.plan.category === "not fixed" || subscription.plan.name?.toLowerCase().includes("hourly");
+                if (!isHourly) {
+                    const seat = await Seat.findOne({ student: student._id });
+                    if (!seat) {
+                        return res.status(400).json({
+                            success: false,
+                            message: "Cannot activate student. Please assign a seat first for this regular/premium subscription plan."
+                        });
+                    }
+                }
+            }
+        } else {
+            // If deactivating the student
             const seat = await Seat.findOne({
                 student: student._id
             });
@@ -467,7 +596,6 @@ export const toggleStudentStatus = async (req, res) => {
 
             // Remove seat from student
             student.seatId = null;
-
         }
 
         await student.save();
@@ -636,4 +764,40 @@ export const filterStudents = async (req, res) => {
 
     }
 
+};
+
+/*
+=================================================
+Delete Student/Admin
+=================================================
+*/
+export const deleteStudent = async (req, res) => {
+    try {
+        const student = await User.findById(req.params.id);
+        if (!student) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found."
+            });
+        }
+
+        // Free up any seat allocated to this student
+        await Seat.updateMany(
+            { student: req.params.id },
+            { $set: { student: null, status: "available" } }
+        );
+
+        // Delete user
+        await student.deleteOne();
+
+        res.status(200).json({
+            success: true,
+            message: `${student.role === 'admin' ? 'Admin' : 'Student'} deleted successfully.`
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
 };

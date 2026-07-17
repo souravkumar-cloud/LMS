@@ -1,7 +1,8 @@
 import SeatRequest from "../models/SeatRequest.js";
 import Seat from "../models/Seat.js";
-import User from "../models/User.js"
-
+import User from "../models/User.js";
+import SubscriptionPlan from "../models/SubscriptionPlan.js";
+import Subscription from "../models/Subscription.js";
 
 export const requestSeat=async(req,res)=>{
     try {
@@ -183,9 +184,16 @@ export const getMySeat=async(req,res)=>{
         const seat=await Seat.findOne({
             student:studentId
         });
+
+        const subscription=await Subscription.findOne({
+            student:studentId,
+            status:"active"
+        }).populate("plan");
+
         res.status(200).json({
             success:true,
-            seat
+            seat,
+            subscription
         })
     } catch (error) {
         res.status(500).json({
@@ -254,15 +262,13 @@ export const addSeat=async(req,res)=>{
 
 export const getAvailableSeats=async(req,res)=>{
     try {
-        const seats=await Seat.find({
-            status:"available"
-        }).sort({
+        const seats=await Seat.find().sort({
             seatNumber:1
         });
 
         res.status(200).json({
             success:true,
-            totalAvailable:seats.length,
+            totalAvailable:seats.filter(s => s.status === "available").length,
             seats
         });
     } catch (error) {

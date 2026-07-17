@@ -2,18 +2,11 @@ import api from "./api";
 
 const studentService = {
 
-    addStudent: async (formData) => {
-
+    addStudent: async (data) => {
         const response = await api.post(
             "/student/add",
-            formData,
-            {
-                headers: {
-                    "Content-Type": "multipart/form-data"
-                }
-            }
+            data
         );
-
         return response.data;
     },
 

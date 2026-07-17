@@ -62,6 +62,14 @@ const notificationService = {
 
         return response.data;
 
+    },
+
+    sendMessageToAdmin: async (message) => {
+        const response = await api.post(
+            "/notification/send-to-admin",
+            { message }
+        );
+        return response.data;
     }
 
 };

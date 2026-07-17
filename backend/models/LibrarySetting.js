@@ -73,7 +73,31 @@ const librarySettingSchema = new mongoose.Schema(
 
             type: Boolean,
 
+            default: false
+
+        },
+
+        allowSeatChange: {
+
+            type: Boolean,
+
             default: true
+
+        },
+
+        allowHourlySeat: {
+
+            type: Boolean,
+
+            default: true
+
+        },
+
+        premiumExtraCharge: {
+
+            type: Number,
+
+            default: 500
 
         },
 

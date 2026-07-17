@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Loader from "../../components/common/Loader";
 import profileService from "../../services/profileService";
+import { useAuth } from "../../context/AuthContext";
 
 const Profile = () => {
+    const { updateUser } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [preview, setPreview] = useState("");
 
     const [formData, setFormData] = useState({
 
@@ -17,8 +18,7 @@ const Profile = () => {
         aadhaar: "",
         gender: "Male",
         address: "",
-        emergencyContact: "",
-        profilePhoto: null
+        emergencyContact: ""
 
     });
 
@@ -38,12 +38,9 @@ const Profile = () => {
                 aadhaar: user.aadhaar || "",
                 gender: user.gender || "Male",
                 address: user.address || "",
-                emergencyContact: user.emergencyContact || "",
-                profilePhoto: null
+                emergencyContact: user.emergencyContact || ""
 
             });
-
-            setPreview(user.profilePhoto || "");
 
         } catch {
 
@@ -75,23 +72,7 @@ const Profile = () => {
 
     };
 
-    const handleImage = (e) => {
 
-        const file = e.target.files[0];
-
-        if (!file) return;
-
-        setPreview(URL.createObjectURL(file));
-
-        setFormData({
-
-            ...formData,
-
-            profilePhoto: file
-
-        });
-
-    };
 
     const handleSubmit = async (e) => {
 
@@ -113,7 +94,9 @@ const Profile = () => {
 
             });
 
-            await profileService.updateProfile(data);
+            const res = await profileService.updateProfile(data);
+
+            updateUser(res.user);
 
             toast.success("Profile Updated Successfully");
 
@@ -231,29 +214,7 @@ const Profile = () => {
 
                 </div>
 
-                <div className="md:col-span-2">
 
-                    <label className="block mb-2 font-medium">
-                        Profile Photo
-                    </label>
-
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImage}
-                    />
-
-                    {preview && (
-
-                        <img
-                            src={preview}
-                            alt="Preview"
-                            className="w-32 h-32 rounded-full object-cover mt-5 border"
-                        />
-
-                    )}
-
-                </div>
 
                 <div className="md:col-span-2">
 

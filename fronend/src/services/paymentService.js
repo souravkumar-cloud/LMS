@@ -50,6 +50,32 @@ const paymentService = {
 
         );
 
+    },
+
+    deletePayment: async (id) => {
+
+        const response = await api.delete(
+
+            `/payment/delete/${id}`
+
+        );
+
+        return response.data;
+
+    },
+
+    collectPayment: async (id, paymentMethod) => {
+
+        const response = await api.put(
+
+            `/payment/collect/${id}`,
+
+            { paymentMethod }
+
+        );
+
+        return response.data;
+
     }
 
 };

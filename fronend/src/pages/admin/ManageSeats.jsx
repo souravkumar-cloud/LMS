@@ -390,9 +390,20 @@ const ManageSeats = () => {
 
                                         {
 
-                                            seat.student?.fullName ||
+                                            seat.student ? (
 
-                                            "-"
+                                                <Link
+                                                    to={`/admin/student/${seat.student._id}`}
+                                                    className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                                                >
+                                                    {seat.student.fullName}
+                                                </Link>
+
+                                            ) : (
+
+                                                "-"
+
+                                            )
 
                                         }
 

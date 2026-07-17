@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
     IndianRupee,
-    Download,
+    Trash2,
     Search,
     CreditCard
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 import Loader from "../../components/common/Loader";
 import paymentService from "../../services/paymentService";
@@ -31,9 +32,9 @@ const PaymentManagement = () => {
 
             ]);
 
-            setPayments(paymentRes.payments);
+            setPayments(paymentRes.payments || []);
 
-            setRevenue(revenueRes.totalRevenue);
+            setRevenue(revenueRes.revenue || 0);
 
         }
 
@@ -45,6 +46,21 @@ const PaymentManagement = () => {
 
     };
 
+    const handleDeletePayment = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this payment record? This cannot be undone.")) {
+            return;
+        }
+
+        try {
+            await paymentService.deletePayment(id);
+            toast.success("Payment record deleted successfully");
+            fetchData();
+        } catch (error) {
+            console.log(error);
+            toast.error(error.response?.data?.message || "Failed to delete payment record");
+        }
+    };
+
     useEffect(() => {
 
         fetchData();
@@ -53,15 +69,13 @@ const PaymentManagement = () => {
 
     const filteredPayments = useMemo(() => {
 
-        return payments.filter((payment) =>
+        return payments.filter((payment) => {
 
-            payment.student.fullName
+            const studentName = payment.student?.fullName || "Deleted Student";
 
-                .toLowerCase()
+            return studentName.toLowerCase().includes(search.toLowerCase());
 
-                .includes(search.toLowerCase())
-
-        );
+        });
 
     }, [payments, search]);
 
@@ -199,7 +213,7 @@ const PaymentManagement = () => {
 
                             <th>
 
-                                Receipt
+                                Actions
 
                             </th>
 
@@ -229,7 +243,7 @@ const PaymentManagement = () => {
 
                                     <td>
 
-                                        {payment.student.fullName}
+                                        {payment.student?.fullName || "Deleted Student"}
 
                                     </td>
 
@@ -247,9 +261,9 @@ const PaymentManagement = () => {
 
                                     <td>
 
-                                        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                                        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full capitalize">
 
-                                            {payment.status}
+                                            {payment.paymentStatus || payment.status}
 
                                         </span>
 
@@ -261,7 +275,7 @@ const PaymentManagement = () => {
 
                                             onClick={()=>
 
-                                                paymentService.downloadReceipt(
+                                                handleDeletePayment(
 
                                                     payment._id
 
@@ -269,11 +283,12 @@ const PaymentManagement = () => {
 
                                             }
 
-                                            className="bg-blue-600 text-white rounded-lg p-2"
+                                            className="bg-rose-500 hover:bg-rose-600 text-white rounded-lg p-2 cursor-pointer transition active:scale-95 flex items-center justify-center mx-auto"
+                                            title="Delete Payment"
 
                                         >
 
-                                            <Download size={18}/>
+                                            <Trash2 size={18}/>
 
                                         </button>
 

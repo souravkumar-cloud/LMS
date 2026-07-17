@@ -8,7 +8,6 @@ import ChangePassword from "./pages/student/ChangePassword";
 import AdminLayout from "./layouts/AdminLayout";
 import AddSeat from "./pages/admin/AddSeat";
 import StudentLayout from "./layouts/StudentLayout";
-import Attendance from "./pages/student/Attendance";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute";
 import ManageSeats from "./pages/admin/ManageSeats";
@@ -26,7 +25,7 @@ import StudentDetails from "./pages/admin/StudentDetails";
 import EditStudent from "./pages/admin/EditStudent"
 import EditSeat from "./pages/admin/EditSeat"
 import AttendanceReport from "./pages/admin/AttendanceReport";
-import Reports from "./pages/admin/Reports";
+import PendingFees from "./pages/admin/PendingFees";
 import Recipts from "./pages/student/Recipts";
 import Profile from "./pages/student/Profile";
 
@@ -70,6 +69,14 @@ function App() {
             }
           />
           <Route
+            path="/admin/notifications"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <Notifications/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/student/:id"
             element={
                 <ProtectedRoute allowedRole="admin">
@@ -88,10 +95,10 @@ function App() {
         />
 
          <Route
-            path="/admin/reports"
+            path="/admin/pending-fees"
             element={
                 <ProtectedRoute allowedRole="admin">
-                    <Reports />
+                    <PendingFees />
                 </ProtectedRoute>
             }
         />
@@ -195,13 +202,48 @@ function App() {
             path="/student/my-seat"
             element={<ProtectedRoute allowedRole="student"><MySeat/></ProtectedRoute>}
           />
+          <Route
+            path="/student/notifications"
+            element={<ProtectedRoute allowedRole="student"><Notifications/></ProtectedRoute>}
+          />
         </Route>
         <Route
     path="*"
     element={<NotFound />}
  />
       </Routes>
-
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          className: 'font-["Outfit",sans-serif]',
+          duration: 4000,
+          style: {
+            background: 'rgba(255, 255, 255, 0.95)',
+            color: '#0f172a',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            borderRadius: '1rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '600',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#ffffff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#ffffff',
+            },
+          },
+        }}
+      />
     </BrowserRouter>
   );
 }
